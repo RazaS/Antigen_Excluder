@@ -2,19 +2,26 @@ library(shiny)
 library(dplyr)
 
 # Read data (You would replace this with reading from 'data_excluder.csv')
-data <- read.csv("data_excluder.csv")
+data <- read.csv("data_excluder3.csv")
+antigen_info <- read.csv("antigen_info.csv")
 
 
 # Define a function to determine the highest ranking value
 calculateResult <- function(row) {
   values <- as.character(unlist(row[2:length(row)]))
-  rank <- c("+", "+/0", "w", "+/w", "0")
+  rank <- c("+", "+/0", "w", "+/w", "0", "?")
   # Find the highest ranking value
   highestRank <- rank[min(match(values, rank, nomatch = length(rank)))]
   
   # Find the lowest ranking value
   lowestRank <- rank[max(match(values, rank, nomatch = length(rank)))]
   
+  # Return NA if the highest rank is 0
+  if (lowestRank == "0") {
+    return(NA)
+  } else {
+    return(lowestRank)
+  }
   
   return(lowestRank)
 }
@@ -25,8 +32,8 @@ ui <- fluidPage(
   HTML("<p>Instructions and Key:</p>
        
        <li>1. Select at least one antigen and one antibody</li>
-       <li>2. As you select multiple tests, the algorithm chooses the result with least residual antibody positivity</li>
-       <li>3. Reach out to s.raza@mail.utoronto.ca to suggest more tests!</li>
+       <li>2. If you concurrently select multiple tests, the algorithm chooses the result with least residual antibody positivity</li>
+       <li>3. The result pane shows antibodies which haven't been excluded</li>
        </br>
        <li>0 = antibody nonreactive</li>
        <li>+/0 = some examples reactive, others nonreactive</li>
@@ -35,6 +42,10 @@ ui <- fluidPage(
        <li>+ = antibody reactive</li>
        </br>"),  # Instructions text
   actionButton("reset", "Reset"),
+  actionButton("checkAll", "Check All Antibodies"),  # Add a button to check all antibodies
+  actionButton("typical", "Standard Panel"),  # Add a button to check all antibodies
+  actionButton("highFreq", "High Frequency"),  # Add a button for high frequency antibodies
+  actionButton("lowFreq", "Low Frequency"),  # Add a button for high frequency antibodies
   sidebarLayout(
     sidebarPanel(
       fluidRow(
@@ -54,6 +65,9 @@ ui <- fluidPage(
                tableOutput("selectedData")
         ),
         column(6,
+               
+               HTML("<b>Non-Excluded Antibodies:</b>"),
+               
                uiOutput("resultDisplay")
         )
       )
@@ -63,6 +77,43 @@ ui <- fluidPage(
 
 # Define server logic
 server <- function(input, output, session) {
+  
+  observeEvent(input$highFreq, {
+    # Get the list of high frequency antibodies
+    highFreqAntibodies <- antigen_info$Antibody[antigen_info$High_Freq == 1]
+    # Update the selected antibodies
+    updateCheckboxGroupInput(session, "antibodyInput", selected = highFreqAntibodies)
+  })
+  
+  observeEvent(input$typical, {
+    # Get the list of high frequency antibodies
+    typicalAntibodies <- antigen_info$Antibody[antigen_info$Typical == 1]
+    # Update the selected antibodies
+    updateCheckboxGroupInput(session, "antibodyInput", selected = typicalAntibodies)
+  })
+  
+  
+  
+  observeEvent(input$lowFreq, {
+    # Get the list of high frequency antibodies
+    lowFreqAntibodies <- antigen_info$Antibody[antigen_info$Low_Freq == 1]
+    # Update the selected antibodies
+    updateCheckboxGroupInput(session, "antibodyInput", selected = lowFreqAntibodies)
+  })
+  
+  
+  observeEvent(input$reset, {
+    # Reset checkboxes
+    updateCheckboxGroupInput(session, "antibodyInput", selected = character(0))
+    updateCheckboxGroupInput(session, "testInput", selected = character(0))
+  })
+  
+  observeEvent(input$checkAll, {
+    # Select all antibodies
+    updateCheckboxGroupInput(session, "antibodyInput", selected = data$Antibody)
+  })
+  
+  
   observeEvent(input$reset, {
     # Reset checkboxes
     updateCheckboxGroupInput(session, "antibodyInput", selected = character(0))
@@ -93,6 +144,11 @@ server <- function(input, output, session) {
     # Add result column
     selectedData$result <- apply(selectedData, 1, calculateResult)
     # Display only Antibody and result columns
+    
+    ### remove null antibodies
+    selectedData <- selectedData %>% filter(!is.na(result))
+    
+    ### display table
     resultTable <- selectedData %>% select(Antibody, result)
     resultTable
   })

@@ -1,11 +1,11 @@
 name: AntigenExcluder
-title:
+title: AntigenExcluder
 username: razas2
 account: razas2
 server: shinyapps.io
 hostUrl: https://api.shinyapps.io/v1
 appId: 10488739
-bundleId: 7913289
+bundleId: 7923408
 url: https://razas2.shinyapps.io/AntigenExcluder/
 version: 1
 asMultiple: FALSE
